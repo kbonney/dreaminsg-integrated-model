@@ -1,0 +1,8 @@
+ipykernel
+wntr
+pandas
+pandapower
+contextily
+seaborn
+bokeh
+geopandas
