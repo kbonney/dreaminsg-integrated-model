@@ -7,3 +7,5 @@ seaborn
 bokeh
 geopandas
 jupyter_bokeh
+jupyter
+notebook
