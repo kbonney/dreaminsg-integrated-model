@@ -11,9 +11,14 @@ from bokeh.io import curdoc, output_notebook, show
 from bokeh.models import ColorBar, ColumnDataSource, HoverTool, Range1d
 from bokeh.palettes import RdYlGn, Turbo256, Viridis3
 from bokeh.plotting import figure
-
-from bokeh.tile_providers import CARTODBPOSITRON_RETINA, get_provider, ESRI_IMAGERY
 from bokeh.transform import factor_cmap, linear_cmap
+import matplotlib
+matplotlib.use('Agg')
+
+# Get tile providers using Bokeh 3.x's built-in providers
+CARTODBPOSITRON_RETINA = "CartoDB Positron"
+ESRI_IMAGERY = "Esri World Imagery"
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -140,11 +145,11 @@ def plot_bokeh_from_integrated_graph(
     :type extent: list, optional
     """
     output_notebook()
-    tile_provider = get_provider(ESRI_IMAGERY)
+    tile_provider = ESRI_IMAGERY
 
     p = figure(
         background_fill_color="white",
-        plot_width=800,
+        width=800,
         height=500,
         title=title,
         x_range=(extent[0][0], extent[1][0]),
@@ -283,6 +288,7 @@ def plot_bokeh_from_integrated_graph(
     p.grid.visible = False
     p.axis.visible = False
     show(p)
+    return p
 
 
 def plot_bokeh_lines(
@@ -358,8 +364,8 @@ def plot_repair_curves(network_recovery, scatter=False):
 
     curdoc().theme = "light_minimal"
     p = figure(
-        plot_width=750,
-        plot_height=450,
+        width=750,
+        height=450,
         title="Disrupted components and their restoration",
         x_axis_label="Time (min)",
         y_axis_label="Damage level (%)",
@@ -600,7 +606,7 @@ def plot_network_impact_map(
 
     p = figure(
         background_fill_color="white",
-        plot_width=785,
+        width=800,
         height=500,
         # title=f"Mean consumer-level outage during floods: {strategy}-based recovery strategy",
         x_range=(1400, 7400),
@@ -822,16 +828,16 @@ def plot_disruptions_and_crews(integrated_network, basemap=False):
     extent = integrated_network.map_extends
     p = figure(
         background_fill_color="white",
-        plot_width=800,
+        width=800,
         height=450,
-        # x_range=(extent[0][0] - 100, extent[1][0] + 100),
-        # y_range=(extent[0][1] - 100, extent[1][1] + 100),
     )
     p.axis.visible = False
 
-    tile_provider = get_provider(CARTODBPOSITRON_RETINA)
+    tile_provider = CARTODBPOSITRON_RETINA
     if basemap:
         p.add_tile(tile_provider)
+    else:
+        p.background_fill_color = "black"
 
     failed_components_list = integrated_network.disrupted_components.to_list()
     affected_nodes = {}
