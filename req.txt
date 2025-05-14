@@ -6,3 +6,4 @@ contextily
 seaborn
 bokeh
 geopandas
+jupyter_bokeh
