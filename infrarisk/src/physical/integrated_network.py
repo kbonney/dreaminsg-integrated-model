@@ -14,6 +14,9 @@ import infrarisk.src.repair_crews as repair_crews
 import numpy as np
 import geopandas as gpd
 
+# Import tile providers
+import xyzservices.providers as xyz
+
 
 class IntegratedNetwork:
     """An integrated infrastructure network class"""
@@ -268,7 +271,7 @@ class IntegratedNetwork:
         title = f"{self.name} integrated network"
 
         self.generate_betweenness_centrality()
-        model_plots.plot_bokeh_from_integrated_graph(
+        return model_plots.plot_bokeh_from_integrated_graph(
             G, title=title, extent=self.map_extends, basemap=basemap
         )
 
@@ -321,7 +324,7 @@ class IntegratedNetwork:
         :return: The power network as a networkx object.
         :rtype: networkx.Graph
         """
-        G_power = nx.Graph()
+        G_power = nx.DiGraph()
 
         # power network nodes
         power_nodes = pd.DataFrame(
@@ -329,16 +332,13 @@ class IntegratedNetwork:
         )
 
         for index, row in self.pn.bus.iterrows():
-            power_nodes = power_nodes.append(
-                {
-                    "id": row["name"],
-                    "node_type": "power",
-                    "node_category": "Bus",
-                    "x": self.pn.bus_geodata.x[index],
-                    "y": self.pn.bus_geodata.y[index],
-                },
-                ignore_index=True,
-            )
+            power_nodes = pd.concat([power_nodes, pd.DataFrame([{
+                "id": row["name"],
+                "node_type": "power",
+                "node_category": "Bus",
+                "x": self.pn.bus_geodata.x[index],
+                "y": self.pn.bus_geodata.y[index],
+            }])], ignore_index=True)
 
         # power network links
         power_links = pd.DataFrame(
@@ -346,46 +346,38 @@ class IntegratedNetwork:
         )
 
         for _, row in self.pn.line.iterrows():
-            power_links = power_links.append(
-                {
-                    "id": row["name"],
-                    "link_type": "power",
-                    "link_category": "Power line",
-                    "from": self.pn.bus.name.values[row["from_bus"]],
-                    "to": self.pn.bus.name.values[row["to_bus"]],
-                },
-                ignore_index=True,
-            )
+            power_links = pd.concat([power_links, pd.DataFrame([{
+                "id": row["name"],
+                "link_type": "power",
+                "link_category": "Power line",
+                "from": self.pn.bus.name.values[row["from_bus"]],
+                "to": self.pn.bus.name.values[row["to_bus"]],
+            }])], ignore_index=True)
 
         for _, row in self.pn.trafo.iterrows():
-            power_links = power_links.append(
-                {
-                    "id": row["name"],
-                    "link_type": "power",
-                    "link_category": "Transformer",
-                    "from": self.pn.bus.name.values[row["hv_bus"]],
-                    "to": self.pn.bus.name.values[row["lv_bus"]],
-                },
-                ignore_index=True,
-            )
+            power_links = pd.concat([power_links, pd.DataFrame([{
+                "id": row["name"],
+                "link_type": "power",
+                "link_category": "Transformer",
+                "from": self.pn.bus.name.values[row["hv_bus"]],
+                "to": self.pn.bus.name.values[row["lv_bus"]],
+            }])], ignore_index=True)
 
         for _, row in self.pn.switch[self.pn.switch.et == "b"].iterrows():
-            power_links = power_links.append(
-                {
-                    "id": row["name"],
-                    "link_type": "power",
-                    "link_category": "Switch",
-                    "from": self.pn.bus.name.values[row["bus"]],
-                    "to": self.pn.bus.name.values[row["element"]],
-                },
-                ignore_index=True,
-            )
+            power_links = pd.concat([power_links, pd.DataFrame([{
+                "id": row["name"],
+                "link_type": "power",
+                "link_category": "Switch",
+                "from": self.pn.bus.name.values[row["bus"]],
+                "to": self.pn.bus.name.values[row["element"]],
+            }])], ignore_index=True)
 
         G_power = nx.from_pandas_edgelist(
             power_links,
             source="from",
             target="to",
             edge_attr=["id", "link_type", "link_category"],
+            create_using=nx.DiGraph()
         )
 
         for _, row in power_nodes.iterrows():
@@ -420,7 +412,7 @@ class IntegratedNetwork:
         :return: The water network as a networkx object.
         :rtype: networkx.Graph
         """
-        G_water = nx.Graph()
+        G_water = nx.DiGraph()
 
         # water network nodes
         water_nodes = pd.DataFrame(
@@ -432,38 +424,29 @@ class IntegratedNetwork:
         water_reserv_list = self.wn.reservoir_name_list
 
         for _, node_name in enumerate(water_junc_list):
-            water_nodes = water_nodes.append(
-                {
-                    "id": node_name,
-                    "node_type": "water",
-                    "node_category": "Junction",
-                    "x": list(self.wn.get_node(node_name).coordinates)[0],
-                    "y": list(self.wn.get_node(node_name).coordinates)[1],
-                },
-                ignore_index=True,
-            )
+            water_nodes = pd.concat([water_nodes, pd.DataFrame([{
+                "id": node_name,
+                "node_type": "water",
+                "node_category": "Junction",
+                "x": list(self.wn.get_node(node_name).coordinates)[0],
+                "y": list(self.wn.get_node(node_name).coordinates)[1],
+            }])], ignore_index=True)
         for _, node_name in enumerate(water_tank_list):
-            water_nodes = water_nodes.append(
-                {
-                    "id": node_name,
-                    "node_type": "water",
-                    "node_category": "Tank",
-                    "x": list(self.wn.get_node(node_name).coordinates)[0],
-                    "y": list(self.wn.get_node(node_name).coordinates)[1],
-                },
-                ignore_index=True,
-            )
+            water_nodes = pd.concat([water_nodes, pd.DataFrame([{
+                "id": node_name,
+                "node_type": "water",
+                "node_category": "Tank",
+                "x": list(self.wn.get_node(node_name).coordinates)[0],
+                "y": list(self.wn.get_node(node_name).coordinates)[1],
+            }])], ignore_index=True)
         for _, node_name in enumerate(water_reserv_list):
-            water_nodes = water_nodes.append(
-                {
-                    "id": node_name,
-                    "node_type": "water",
-                    "node_category": "Reservoir",
-                    "x": list(self.wn.get_node(node_name).coordinates)[0],
-                    "y": list(self.wn.get_node(node_name).coordinates)[1],
-                },
-                ignore_index=True,
-            )
+            water_nodes = pd.concat([water_nodes, pd.DataFrame([{
+                "id": node_name,
+                "node_type": "water",
+                "node_category": "Reservoir",
+                "x": list(self.wn.get_node(node_name).coordinates)[0],
+                "y": list(self.wn.get_node(node_name).coordinates)[1],
+            }])], ignore_index=True)
 
         # water network links
         water_links = pd.DataFrame(
@@ -474,33 +457,28 @@ class IntegratedNetwork:
         water_pump_name_list = self.wn.pump_name_list
 
         for _, link_name in enumerate(water_pipe_name_list):
-            water_links = water_links.append(
-                {
-                    "id": link_name,
-                    "link_type": "water",
-                    "link_category": "Water pipe",
-                    "from": self.wn.get_link(link_name).start_node_name,
-                    "to": self.wn.get_link(link_name).end_node_name,
-                },
-                ignore_index=True,
-            )
+            water_links = pd.concat([water_links, pd.DataFrame([{
+                "id": link_name,
+                "link_type": "water",
+                "link_category": "Water pipe",
+                "from": self.wn.get_link(link_name).start_node_name,
+                "to": self.wn.get_link(link_name).end_node_name,
+            }])], ignore_index=True)
         for _, link_name in enumerate(water_pump_name_list):
-            water_links = water_links.append(
-                {
-                    "id": link_name,
-                    "link_type": "water",
-                    "link_category": "Water pump",
-                    "from": self.wn.get_link(link_name).start_node_name,
-                    "to": self.wn.get_link(link_name).end_node_name,
-                },
-                ignore_index=True,
-            )
+            water_links = pd.concat([water_links, pd.DataFrame([{
+                "id": link_name,
+                "link_type": "water",
+                "link_category": "Water pump",
+                "from": self.wn.get_link(link_name).start_node_name,
+                "to": self.wn.get_link(link_name).end_node_name,
+            }])], ignore_index=True)
 
         G_water = nx.from_pandas_edgelist(
             water_links,
             source="from",
             target="to",
             edge_attr=["id", "link_type", "link_category"],
+            create_using=nx.DiGraph()
         )
 
         for _, row in water_nodes.iterrows():
@@ -543,20 +521,17 @@ class IntegratedNetwork:
 
         transpo_node_list = list(self.tn.node.keys())
         for _, node_name in enumerate(list(transpo_node_list)):
-            transpo_nodes = transpo_nodes.append(
-                {
-                    "id": node_name,
-                    "node_type": "transpo",
-                    "node_category": "Junction",
-                    "x": self.tn.node_coords[
-                        self.tn.node_coords["Node"] == node_name
-                    ].X,
-                    "y": self.tn.node_coords[
-                        self.tn.node_coords["Node"] == node_name
-                    ].Y,
-                },
-                ignore_index=True,
-            )
+            transpo_nodes = pd.concat([transpo_nodes, pd.DataFrame([{
+                "id": node_name,
+                "node_type": "transpo",
+                "node_category": "Junction",
+                "x": self.tn.node_coords[
+                    self.tn.node_coords["Node"] == node_name
+                ].X,
+                "y": self.tn.node_coords[
+                    self.tn.node_coords["Node"] == node_name
+                ].Y,
+            }])], ignore_index=True)
 
         # transportation network links
         transpo_links = pd.DataFrame(
@@ -564,16 +539,13 @@ class IntegratedNetwork:
         )
         transpo_link_list = list(self.tn.link.keys())
         for _, link_name in enumerate(list(transpo_link_list)):
-            transpo_links = transpo_links.append(
-                {
-                    "id": link_name,
-                    "link_type": "transpo",
-                    "link_category": "Road link",
-                    "from": self.tn.link[link_name].tail,
-                    "to": self.tn.link[link_name].head,
-                },
-                ignore_index=True,
-            )
+            transpo_links = pd.concat([transpo_links, pd.DataFrame([{
+                "id": link_name,
+                "link_type": "transpo",
+                "link_category": "Road link",
+                "from": self.tn.link[link_name].tail,
+                "to": self.tn.link[link_name].head,
+            }])], ignore_index=True)
 
         G_transpo = nx.from_pandas_edgelist(
             transpo_links,

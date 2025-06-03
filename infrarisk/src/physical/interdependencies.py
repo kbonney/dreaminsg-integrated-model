@@ -99,15 +99,13 @@ class DependencyTable:
         :param power_id: The name of the motor in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
-            {
-                "water_id": water_id,
-                "power_id": power_id,
-                "water_type": "Pump",
-                "power_type": "Motor",
-            },
-            ignore_index=True,
-        )
+        new_row = pd.DataFrame({
+            "water_id": [water_id],
+            "power_id": [power_id],
+            "water_type": ["Pump"],
+            "power_type": ["Motor"],
+        })
+        self.wp_table = pd.concat([self.wp_table, new_row], ignore_index=True)
 
     def add_pump_loadmotor_coupling(self, water_id, power_id):
         """Creates a pump-on-motor dependency entry in the dependency table when motor is modled as a load.
@@ -117,15 +115,13 @@ class DependencyTable:
         :param power_id: The name of the motor (modeled as load in three phase pandapower networks) in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
-            {
-                "water_id": water_id,
-                "power_id": power_id,
-                "water_type": "Pump",
-                "power_type": "Motor as Load",
-            },
-            ignore_index=True,
-        )
+        new_row = pd.DataFrame({
+            "water_id": [water_id],
+            "power_id": [power_id],
+            "water_type": ["Pump"],
+            "power_type": ["Motor as Load"],
+        })
+        self.wp_table = pd.concat([self.wp_table, new_row], ignore_index=True)
 
     def add_gen_reserv_coupling(self, water_id, power_id):
         """Creates a generator-on-reservoir dependency entry in the dependency table.
@@ -135,15 +131,13 @@ class DependencyTable:
         :param power_id: The name of the generator in the power systems model.
         :type power_id: string
         """
-        self.wp_table = self.wp_table.append(
-            {
-                "water_id": water_id,
-                "power_id": power_id,
-                "water_type": "Reservoir",
-                "power_type": "Generator",
-            },
-            ignore_index=True,
-        )
+        new_row = pd.DataFrame({
+            "water_id": [water_id],
+            "power_id": [power_id],
+            "water_type": ["Reservoir"],
+            "power_type": ["Generator"],
+        })
+        self.wp_table = pd.concat([self.wp_table, new_row], ignore_index=True)
 
     def add_transpo_access(self, integrated_graph):
         """Creates a mapping to nearest road link from every water/power network component.
@@ -163,16 +157,14 @@ class DependencyTable:
                 node,
                 "transpo",
             )
-            self.access_table = self.access_table.append(
-                {
-                    "origin_id": node,
-                    "transp_id": near_node,
-                    "origin_cat": comp_details["infra"],
-                    "origin_type": comp_details["name"],
-                    "access_dist": near_dist,
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "origin_id": [node],
+                "transp_id": [near_node],
+                "origin_cat": [comp_details["infra"]],
+                "origin_type": [comp_details["name"]],
+                "access_dist": [near_dist],
+            })
+            self.access_table = pd.concat([self.access_table, new_row], ignore_index=True)
 
     def update_dependencies(self, network, time_stamp, next_time_stamp):
         """Updates the operational performance of all the dependent components in the integrated network.
