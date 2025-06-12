@@ -13,11 +13,10 @@ import matplotlib.pyplot as plt
 import contextily as ctx
 
 from bokeh.io import show
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.models.widgets import Panel, Tabs
+from bokeh.models import ColumnDataSource, HoverTool, Panel, Tabs
 from bokeh.palettes import RdYlGn
 from bokeh.plotting import figure
-from bokeh.tile_providers import Vendors, get_provider
+import xyzservices
 from bokeh.transform import factor_cmap
 
 import infrarisk.src.physical.interdependencies as interdependencies
@@ -263,16 +262,14 @@ class FragilityBasedDisruption:
                         recovery_time = self.assign_recovery_time(node, failure_state)
 
                         G.nodes[node]["failure_state"] = failure_state
-                        self.fail_probs_df = self.fail_probs_df.append(
-                            {
-                                "component": node,
-                                "disruption_time": disruption_time,
-                                "state_probs": fail_probs,
-                                "disruption_state": failure_state,
-                                "recovery_time": recovery_time,
-                            },
-                            ignore_index=True,
-                        )
+                        new_row = pd.DataFrame({
+                            "component": [node],
+                            "disruption_time": [disruption_time],
+                            "state_probs": [fail_probs],
+                            "disruption_state": [failure_state],
+                            "recovery_time": [recovery_time],
+                        })
+                        self.fail_probs_df = pd.concat([self.fail_probs_df, new_row], ignore_index=True)
                     else:
                         G.nodes[node]["failure_state"] = "None"
                 else:
@@ -316,16 +313,14 @@ class FragilityBasedDisruption:
                         )
 
                         G.edges[link]["failure_state"] = failure_state
-                        self.fail_probs_df = self.fail_probs_df.append(
-                            {
-                                "component": link_id,
-                                "disruption_time": disruption_time,
-                                "state_probs": fail_probs,
-                                "disruption_state": failure_state,
-                                "recovery_time": recovery_time,
-                            },
-                            ignore_index=True,
-                        )
+                        new_row = pd.DataFrame({
+                            "component": [link_id],
+                            "disruption_time": [disruption_time],
+                            "state_probs": [fail_probs],
+                            "disruption_state": [failure_state],
+                            "recovery_time": [recovery_time],
+                        })
+                        self.fail_probs_df = pd.concat([self.fail_probs_df, new_row], ignore_index=True)
                     else:
                         G.edges[link]["failure_state"] = "None"
                 else:
@@ -681,14 +676,15 @@ class FragilityBasedDisruption:
         )
         p = figure(
             background_fill_color="white",
-            plot_width=700,
+            width=700,
             height=450,
             title=f"{self.name}: Disrupted {name} Components",
             x_range=(map_extends[0][0], map_extends[1][0]),
             y_range=(map_extends[0][1], map_extends[1][1]),
         )
 
-        tile_provider = get_provider(Vendors.CARTODBPOSITRON)
+        # instantiate the tile source provider
+        tile_provider = xyzservices.providers.CartoDB.Positron
         p.add_tile(tile_provider, alpha=0.8)
 
         # nodes

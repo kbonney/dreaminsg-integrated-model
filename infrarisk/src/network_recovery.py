@@ -430,7 +430,7 @@ class NetworkRecovery:
                 "time_stamp": [recovery_start],
                 "components": [component],
                 "perf_level": [100 - self.network.disruptive_events[
-                    self.network.disruptive_events.components == component
+                        self.network.disruptive_events.components == component
                 ].fail_perc.item()],
                 "component_state": ["Repairing"],
             })
@@ -441,7 +441,7 @@ class NetworkRecovery:
                     "time_stamp": [recovery_end - self.sim_step * 2],
                     "components": [component],
                     "perf_level": [100 - self.network.disruptive_events[
-                        self.network.disruptive_events.components == component
+                            self.network.disruptive_events.components == component
                     ].fail_perc.item()],
                     "component_state": ["Repairing"],
                 })
@@ -485,15 +485,13 @@ class NetworkRecovery:
         """
         max_event_table_time = self.event_table["time_stamp"].max()
         for component in repair_order:
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": max_event_table_time + extra_hours * 3600,
-                    "components": component,
-                    "perf_level": 100,
-                    "component_state": "Service Restored",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [max_event_table_time + extra_hours * 3600],
+                "components": [component],
+                "perf_level": [100],
+                "component_state": ["Service Restored"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
     def schedule_recovery(self, repair_order):
         """Generates the unexpanded event table consisting of disruptions and repair actions.

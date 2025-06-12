@@ -8,7 +8,7 @@ from bokeh.io import show
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.palettes import RdYlGn
 from bokeh.plotting import figure
-from bokeh.tile_providers import Vendors, get_provider
+import xyzservices
 from bokeh.transform import factor_cmap
 
 
@@ -163,15 +163,15 @@ class CustomDisruption:
 
         p = figure(
             background_fill_color="white",
-            plot_width=700,
+            width=700,
             height=450,
             title=f"{self.name}: Disrupted components",
             x_range=(1000, 8000),
             y_range=(1000, 6600),
         )
 
-        # instatiate the tile source provider
-        tile_provider = get_provider(Vendors.CARTODBPOSITRON_RETINA)
+        # instantiate the tile source provider
+        tile_provider = xyzservices.providers.CartoDB.Positron
 
         # add the back ground basemap
         p.add_tile(tile_provider, alpha=0.1)
@@ -290,26 +290,22 @@ class CustomDisruption:
         # add failed nodes
         for _, infra in enumerate(self.affected_nodes.keys()):
             for _, node in enumerate(self.affected_nodes[infra]):
-                self.disrupt_file = self.disrupt_file.append(
-                    {
-                        "time_stamp": self.time_of_occurrence,
-                        "components": node,
-                        "fail_perc": 50,
-                    },
-                    ignore_index=True,
-                )
+                new_row = pd.DataFrame({
+                    "time_stamp": [self.time_of_occurrence],
+                    "components": [node],
+                    "fail_perc": [50],
+                })
+                self.disrupt_file = pd.concat([self.disrupt_file, new_row], ignore_index=True)
 
         # add failed links
         for _, infra in enumerate(self.affected_links):
             for _, link in enumerate(self.affected_links[infra]):
-                self.disrupt_file = self.disrupt_file.append(
-                    {
-                        "time_stamp": self.time_of_occurrence,
-                        "components": link,
-                        "fail_perc": 50,
-                    },
-                    ignore_index=True,
-                )
+                new_row = pd.DataFrame({
+                    "time_stamp": [self.time_of_occurrence],
+                    "components": [link],
+                    "fail_perc": [50],
+                })
+                self.disrupt_file = pd.concat([self.disrupt_file, new_row], ignore_index=True)
 
         if location is not None:
             # added by geeta
@@ -321,11 +317,11 @@ class CustomDisruption:
                     row["components"]
                 )
 
-                if component_details[1] in fail_compon_dict["power"]:
+                if component_details["type_code"] in fail_compon_dict["power"]:
                     indices.append(index)
-                elif component_details[1] in fail_compon_dict["water"]:
+                elif component_details["type_code"] in fail_compon_dict["water"]:
                     indices.append(index)
-                elif component_details[1] in fail_compon_dict["transport"]:
+                elif component_details["type_code"] in fail_compon_dict["transport"]:
                     indices.append(index)
 
             self.disrupt_file = self.disrupt_file.loc[indices]
