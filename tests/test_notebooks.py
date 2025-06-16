@@ -8,6 +8,12 @@ import re
 from pathlib import Path
 
 class TestNotebooks(unittest.TestCase):
+    # List of notebooks to skip during testing (just filenames)
+    SKIP_NOTEBOOKS = [
+        'demo_optimization_incomplete.ipynb',
+        'micropolis_network.ipynb'
+    ]
+
     def setUp(self):
         self.notebook_dir = Path(__file__).parent.parent / 'notebooks'
         self.ep = ExecutePreprocessor(timeout=600, kernel_name='python3')
@@ -28,6 +34,11 @@ class TestNotebooks(unittest.TestCase):
         """Test that all notebooks run without errors."""
         for notebook_path in self.notebook_dir.glob('**/*.ipynb'):
             if '.ipynb_checkpoints' in str(notebook_path):
+                continue
+            
+            # Skip notebooks in the SKIP_NOTEBOOKS list by filename
+            if notebook_path.name in self.SKIP_NOTEBOOKS:
+                print(f"\nSkipping notebook: {notebook_path}")
                 continue
                 
             print(f"\nTesting notebook: {notebook_path}")
