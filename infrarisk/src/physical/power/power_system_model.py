@@ -3,6 +3,8 @@
 import pandapower as pp
 import infrarisk.src.physical.interdependencies as interdependencies
 import copy
+import numpy as np
+import pandas as pd
 
 
 def get_power_dict():
@@ -230,6 +232,22 @@ def load_power_network(network_json, sim_type="1ph"):
     """
     pn = pp.from_json(network_json, convert=True)
     pn.sim_type = sim_type
+    
+    # Create bus coordinates if they don't exist
+    if not hasattr(pn, 'bus_geodata'):
+        # Create a simple grid layout for buses
+        n_buses = len(pn.bus)
+        grid_size = int(np.ceil(np.sqrt(n_buses)))
+        x_coords = np.linspace(0, 100, grid_size)
+        y_coords = np.linspace(0, 100, grid_size)
+        
+        # Create a grid of coordinates
+        xx, yy = np.meshgrid(x_coords, y_coords)
+        coords = np.column_stack((xx.flatten()[:n_buses], yy.flatten()[:n_buses]))
+        
+        # Create bus geodata
+        pn.bus_geodata = pd.DataFrame(coords, index=pn.bus.index, columns=['x', 'y'])
+    
     if sim_type == "1ph":
         print(
             "Power system successfully loaded from {}. Single phase power flow simulation will be used.\n".format(

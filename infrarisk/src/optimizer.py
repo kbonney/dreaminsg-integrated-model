@@ -141,15 +141,13 @@ class BruteForceOptimizer(Optimizer):
                     "Weighted AUC: ",
                     round(weighted_auc, 3),
                 )
-                self.auc_log = self.auc_log.append(
-                    {
-                        "repair_order": cum_repair_order,
-                        "water_auc": round(water_auc, 3),
-                        "power_auc": round(power_auc, 3),
-                        "auc": round(weighted_auc, 3),
-                    },
-                    ignore_index=True,
-                )
+                new_row = pd.DataFrame({
+                    "repair_order": [cum_repair_order],
+                    "water_auc": [round(water_auc, 3)],
+                    "power_auc": [round(power_auc, 3)],
+                    "auc": [round(weighted_auc, 3)],
+                })
+                self.auc_log = pd.concat([self.auc_log, new_row], ignore_index=True)
                 if (self.auc == None) or (
                     resilience_metrics.weighed_pcs_auc >= self.auc
                 ):

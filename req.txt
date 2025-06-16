@@ -1,0 +1,11 @@
+ipykernel
+wntr
+pandas
+pandapower
+contextily
+seaborn
+bokeh
+geopandas
+jupyter_bokeh
+jupyter
+notebook

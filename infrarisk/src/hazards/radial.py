@@ -2,17 +2,17 @@ import os
 import random
 from pathlib import Path
 
+import infrarisk.src.physical.interdependencies as interdependencies
 import numpy as np
 import pandas as pd
 from bokeh.io import show
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.palettes import RdYlGn
 from bokeh.plotting import figure
-from bokeh.tile_providers import Vendors, get_provider
+import xyzservices
 from bokeh.transform import factor_cmap
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
-import infrarisk.src.physical.interdependencies as interdependencies
 
 
 class RadialDisruption:
@@ -41,7 +41,7 @@ class RadialDisruption:
         """
         self.name = name
         self.intensity = intensity
-        # self.set_fail_compon_dict()
+        self.set_fail_compon_dict()
         self.disrupt_file = pd.DataFrame()
         self.set_intensity_failure_probability()
 
@@ -237,15 +237,15 @@ class RadialDisruption:
 
         p = figure(
             background_fill_color="white",
-            plot_width=700,
+            width=700,
             height=450,
             title=f"{self.name}: Disrupted components",
             x_range=(1000, 8000),
             y_range=(1000, 6600),
         )
 
-        # instatiate the tile source provider
-        tile_provider = get_provider(Vendors.CARTODBPOSITRON_RETINA)
+        # instantiate the tile source provider
+        tile_provider = xyzservices.providers.CartoDB.Positron
 
         # add the back ground basemap
         p.add_tile(tile_provider, alpha=0.1)

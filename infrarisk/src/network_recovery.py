@@ -72,49 +72,39 @@ class NetworkRecovery:
                 )
 
     def add_disruption_to_event_table(self):
-        """Schedules the events until the initial disruption events."""
-        column_list = [
+        """Adds the disruption events to the event table."""
+        # ----------------------------------------------------------
+        # Create event table
+        column_list_et_short = [
             "time_stamp",
             "components",
             "perf_level",
             "component_state",
         ]
-        self.event_table = pd.DataFrame(columns=column_list)
-
-        # ----------------------------------------------------------
-        column_list_et_short = [
-            "component",
-            "disrupt_time",
-            "repair_start",
-            "functional_start",
-        ]
+        self.event_table = pd.DataFrame(columns=column_list_et_short)
         self.event_table_wide = pd.DataFrame(columns=column_list_et_short)
         # ----------------------------------------------------------
 
         # Schedule component performance at the start of the simulation.
         for _, component in enumerate(self.network.get_disrupted_components()):
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": 0,
-                    "components": component,
-                    "perf_level": 100,
-                    "component_state": "Functional",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [0],
+                "components": [component],
+                "perf_level": [100],
+                "component_state": ["Functional"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
         # Schedule component disruptions
         for _, row in self.network.disruptive_events.iterrows():
             disrupt_time = get_nearest_time_step(row[0], 2 * self.sim_step)
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": disrupt_time,
-                    "components": row[1],
-                    "perf_level": 100 - row[2],
-                    "component_state": "Service Disrupted",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [disrupt_time],
+                "components": [row[1]],
+                "perf_level": [100 - row[2]],
+                "component_state": ["Service Disrupted"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
             compon_details = interdependencies.get_compon_details(component)
             if compon_details["infra"] == "transpo":
@@ -366,19 +356,15 @@ class NetworkRecovery:
                             <= pipe_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
-                                {
-                                    "time_stamp": pipe_isolation_time,  # Leaks closed within 10 mins
-                                    "components": component,
-                                    "perf_level": 100
-                                    - self.network.disruptive_events[
-                                        self.network.disruptive_events.components
-                                        == component
-                                    ].fail_perc.item(),
-                                    "component_state": "Pipe Isolated",
-                                },
-                                ignore_index=True,
-                            )
+                            new_row = pd.DataFrame({
+                                "time_stamp": [pipe_isolation_time],
+                                "components": [component],
+                                "perf_level": [100 - self.network.disruptive_events[
+                                    self.network.disruptive_events.components == component
+                                ].fail_perc.item()],
+                                "component_state": ["Pipe Isolated"],
+                            })
+                            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
                     elif self._pipe_close_policy == "sensor_based_cluster_isolation":
                         cluster_isolation_time = get_nearest_time_step(
                             disruption_time + self._pipe_closure_delay * 60,
@@ -389,19 +375,15 @@ class NetworkRecovery:
                             <= pipe_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
-                                {
-                                    "time_stamp": cluster_isolation_time,
-                                    "components": component,
-                                    "perf_level": 100
-                                    - self.network.disruptive_events[
-                                        self.network.disruptive_events.components
-                                        == component
-                                    ].fail_perc.item(),
-                                    "component_state": "Valves Isolated",
-                                },
-                                ignore_index=True,
-                            )
+                            new_row = pd.DataFrame({
+                                "time_stamp": [cluster_isolation_time],
+                                "components": [component],
+                                "perf_level": [100 - self.network.disruptive_events[
+                                    self.network.disruptive_events.components == component
+                                ].fail_perc.item()],
+                                "component_state": ["Valves Isolated"],
+                            })
+                            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
             elif compon_details["infra"] == "power":
                 if compon_details["type_code"] in ["L"]:
@@ -415,19 +397,15 @@ class NetworkRecovery:
                             <= line_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
-                                {
-                                    "time_stamp": line_isolation_time,
-                                    "components": component,
-                                    "perf_level": 100
-                                    - self.network.disruptive_events[
-                                        self.network.disruptive_events.components
-                                        == component
-                                    ].fail_perc.item(),
-                                    "component_state": "Line Isolated",
-                                },
-                                ignore_index=True,
-                            )
+                            new_row = pd.DataFrame({
+                                "time_stamp": [line_isolation_time],
+                                "components": [component],
+                                "perf_level": [100 - self.network.disruptive_events[
+                                    self.network.disruptive_events.components == component
+                                ].fail_perc.item()],
+                                "component_state": ["Line Isolated"],
+                            })
+                            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
                     elif self._line_close_policy == "sensor_based_cluster_isolation":
                         cluster_isolation_time = get_nearest_time_step(
                             disruption_time + 2 * self._line_closure_delay * 60,
@@ -438,77 +416,61 @@ class NetworkRecovery:
                             <= cluster_isolation_time
                             <= recovery_start - 2 * self.sim_step
                         ):
-                            self.event_table = self.event_table.append(
-                                {
-                                    "time_stamp": cluster_isolation_time,  # Leaks closed within 10 mins
-                                    "components": component,
-                                    "perf_level": 100
-                                    - self.network.disruptive_events[
-                                        self.network.disruptive_events.components
-                                        == component
-                                    ].fail_perc.item(),
-                                    "component_state": "Switches Isolated",
-                                },
-                                ignore_index=True,
-                            )
+                            new_row = pd.DataFrame({
+                                "time_stamp": [cluster_isolation_time],
+                                "components": [component],
+                                "perf_level": [100 - self.network.disruptive_events[
+                                    self.network.disruptive_events.components == component
+                                ].fail_perc.item()],
+                                "component_state": ["Switches Isolated"],
+                            })
+                            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": recovery_start,
-                    "components": component,
-                    "perf_level": 100
-                    - self.network.disruptive_events[
+            new_row = pd.DataFrame({
+                "time_stamp": [recovery_start],
+                "components": [component],
+                "perf_level": [100 - self.network.disruptive_events[
                         self.network.disruptive_events.components == component
-                    ].fail_perc.item(),
-                    "component_state": "Repairing",
-                },
-                ignore_index=True,
-            )
+                ].fail_perc.item()],
+                "component_state": ["Repairing"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
             if recovery_end - self.sim_step * 2 > recovery_start:
-                self.event_table = self.event_table.append(
-                    {
-                        "time_stamp": recovery_end - self.sim_step * 2,
-                        "components": component,
-                        "perf_level": 100
-                        - self.network.disruptive_events[
+                new_row = pd.DataFrame({
+                    "time_stamp": [recovery_end - self.sim_step * 2],
+                    "components": [component],
+                    "perf_level": [100 - self.network.disruptive_events[
                             self.network.disruptive_events.components == component
-                        ].fail_perc.item(),
-                        "component_state": "Repairing",
-                    },
-                    ignore_index=True,
-                )
+                    ].fail_perc.item()],
+                    "component_state": ["Repairing"],
+                })
+                self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": recovery_end,
-                    "components": component,
-                    "perf_level": 100,
-                    "component_state": "Service Restored",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [recovery_end],
+                "components": [component],
+                "perf_level": [100],
+                "component_state": ["Service Restored"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": recovery_end + self.sim_step * 2,
-                    "components": component,
-                    "perf_level": 100,
-                    "component_state": "Service Restored",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [recovery_end + self.sim_step * 2],
+                "components": [component],
+                "perf_level": [100],
+                "component_state": ["Service Restored"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
             # -----------------------------------------------
-            self.event_table_wide = self.event_table_wide.append(
-                {
-                    "component": component,
-                    "disrupt_time": disruption_time,
-                    "repair_start": recovery_start,
-                    "functional_start": recovery_end,
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "component": [component],
+                "disrupt_time": [disruption_time],
+                "repair_start": [recovery_start],
+                "functional_start": [recovery_end],
+            })
+            self.event_table_wide = pd.concat([self.event_table_wide, new_row], ignore_index=True)
             self.total_recovery_time[compon_details["infra"]] += (
                 recovery_end - recovery_start
             ) / 60
@@ -523,15 +485,13 @@ class NetworkRecovery:
         """
         max_event_table_time = self.event_table["time_stamp"].max()
         for component in repair_order:
-            self.event_table = self.event_table.append(
-                {
-                    "time_stamp": max_event_table_time + extra_hours * 3600,
-                    "components": component,
-                    "perf_level": 100,
-                    "component_state": "Service Restored",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.DataFrame({
+                "time_stamp": [max_event_table_time + extra_hours * 3600],
+                "components": [component],
+                "perf_level": [100],
+                "component_state": ["Service Restored"],
+            })
+            self.event_table = pd.concat([self.event_table, new_row], ignore_index=True)
 
     def schedule_recovery(self, repair_order):
         """Generates the unexpanded event table consisting of disruptions and repair actions.
@@ -1072,52 +1032,32 @@ def pipe_leak_node_generator(network):
 
 
 def pump_outage_event(wn, pump_name, start_time, end_time):
-    # from wntr.network.controls import (
-    #     ControlAction,
-    #     SimTimeCondition,
-    #     AndCondition,
-    #     Rule,
-    # )
-    from wntr.network.base import Node, Link, Registry, LinkStatus
-    from wntr.network.controls import _InternalControlAction, Control
+    """Adds a power outage event to a pump.
+
+    :param wn: Water network object.
+    :type wn: wntr.network.WaterNetworkModel
+    :param pump_name: Name of the pump.
+    :type pump_name: string
+    :param start_time: Time at which the outage starts in seconds.
+    :type start_time: integer
+    :param end_time: Time at which the outage ends in seconds.
+    :type end_time: integer
+    """
+    from wntr.network.controls import ControlAction, SimTimeCondition, Control
 
     pump = wn.get_link(pump_name)
-    # pump._power_outage = True
 
-    # # Outage
-    # act = ControlAction(pump, "status", LinkStatus.Closed)
-    # cond1 = SimTimeCondition(wn, "Above", start_time)
-    # if end_time is not None:
-    #     cond2 = SimTimeCondition(wn, "Below", end_time)
-    #     cond = AndCondition(cond1, cond2)
-    # else:
-    #     cond = cond1
-    # rule = Rule(cond, act, priority=priority)
-    # wn.add_control(f"{pump}_power_off_{start_time}", rule)
+    # Create control to close pump at start_time
+    act_close = ControlAction(pump, "status", wntr.network.LinkStatus.Closed)
+    cond_close = SimTimeCondition(wn, "=", start_time)
+    ctrl_close = Control(cond_close, act_close)
+    wn.add_control(f"{pump_name}_power_off_{start_time}", ctrl_close)
 
-    # # After outage
-    # if add_after_outage_rule and end_time is not None:
-    #     act = ControlAction(pump, "status", LinkStatus.Open)
-    #     cond = SimTimeCondition(wn, "Above", end_time)
-    #     rule = Rule(cond, act, priority=priority)
-    #     wn.add_control(f"{pump}_power_on_{end_time}", rule)
-
-    start_power_outage_action = _InternalControlAction(
-        pump, "_power_outage", LinkStatus.Closed, "status"
-    )
-    end_power_outage_action = _InternalControlAction(
-        pump, "_power_outage", LinkStatus.Open, "status"
-    )
-
-    start_control = Control._time_control(
-        wn, start_time, "SIM_TIME", False, start_power_outage_action
-    )
-    end_control = Control._time_control(
-        wn, end_time, "SIM_TIME", False, end_power_outage_action
-    )
-
-    wn.add_control(pump.name + "_power_off_" + str(start_time), start_control)
-    wn.add_control(pump.name + "_power_on_" + str(end_time), end_control)
+    # Create control to open pump at end_time
+    act_open = ControlAction(pump, "status", wntr.network.LinkStatus.Open)
+    cond_open = SimTimeCondition(wn, "=", end_time)
+    ctrl_open = Control(cond_open, act_open)
+    wn.add_control(f"{pump_name}_power_on_{end_time}", ctrl_open)
 
 
 def link_open_event(wn, pipe_name, time_stamp, state):
