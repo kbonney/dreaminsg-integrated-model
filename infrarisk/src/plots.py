@@ -812,7 +812,11 @@ def plot_region_impact_map(resilience_metrics, sa_dict, strategy, extends):
         ax.set_ylim(extends[2], extends[3])
         # ctx.add_basemap(ax=ax, source=ctx.providers.Stamen.Terrain)
         # ctx.add_basemap(ax=ax, source=ctx.providers.CartoDB.Positron)
-        ctx.add_basemap(ax=ax, source=ctx.providers.Esri.WorldStreetMap)
+        try:
+            ctx.add_basemap(ax=ax, source=ctx.providers.Esri.WorldStreetMap)
+        except Exception as e:
+            print(e)
+            print("Could not add basemap - continuing without it")
         ax.set_axis_off()
     fig.tight_layout()
 

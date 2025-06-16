@@ -737,7 +737,10 @@ class SocioEconomicTable:
         axes[0].set_xlim(self.bounds[0], self.bounds[1])
         axes[0].set_ylim(self.bounds[2], self.bounds[3])
         axes[0].axis("off")
-        # ctx.add_basemap(ax=axes[0], source=ctx.providers.Stamen.Terrain)
+        try:
+            ctx.add_basemap(ax=axes[0], source=ctx.providers.CartoDB.Positron)
+        except Exception as e:
+            print(f"Warning: Could not load basemap. Proceeding without basemap. Error: {str(e)}")
 
         # Plot the histogram
         axes[1].set_title(title)
@@ -802,7 +805,10 @@ class SocioEconomicTable:
         axes[0].set_xlim(self.bounds[0], self.bounds[1])
         axes[0].set_ylim(self.bounds[2], self.bounds[3])
         axes[0].axis("off")
-        ctx.add_basemap(ax=axes[0], source=ctx.providers.Stamen.Terrain)
+        try:
+            ctx.add_basemap(ax=axes[0], source=ctx.providers.CartoDB.Positron)
+        except Exception as e:
+            print(f"Warning: Could not load basemap. Proceeding without basemap. Error: {str(e)}")
 
         # Plot the histogram
         # axes[1].set_title(title)

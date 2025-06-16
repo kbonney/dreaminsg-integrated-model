@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 import contextily as ctx
 
 from bokeh.io import show
-from bokeh.models import ColumnDataSource, HoverTool, Panel, Tabs
+from bokeh.models import ColumnDataSource, HoverTool, Panel, Tabs, TabPanel
 from bokeh.palettes import RdYlGn
 from bokeh.plotting import figure
 import xyzservices
 from bokeh.transform import factor_cmap
 
 import infrarisk.src.physical.interdependencies as interdependencies
+from requests.exceptions import SSLError
 
 
 class FragilityBasedDisruption:
@@ -397,30 +398,33 @@ class FragilityBasedDisruption:
 
     @staticmethod
     def get_imt_at_point(coords, imt_type, gmf_gpd):
-        """Returns the intensity measure (PGA, PGV, or PGD) at a point if corresponding fragility curves are available.
+        """Gets the intensity measure value at a point using interpolation
 
-        :param coords: The coordinates of the point (latitude, longitude) in UTM
-        :type coords: list
-        :param imt_type: The intensity measure type (PGA, PGV, PGD)
+        :param coords: The coordinates of the point
+        :type coords: tuple
+        :param imt_type: The intensity measure type
         :type imt_type: str
         :param gmf_gpd: The ground motion field data
         :type gmf_gpd: geopandas.GeoDataFrame
-        :return: The intensity measure at the point
+        :return: The interpolated intensity measure value
         :rtype: float
         """
-        node_point = Point(coords)
-        node_buffer = node_point.buffer(5000)
-        intersects = gmf_gpd.intersects(node_buffer)
-        gmf_point = gmf_gpd[intersects]
-
-        xs = np.array(gmf_point.geometry.x)
-        ys = np.array(gmf_point.geometry.y)
-
-        points = [[x, y] for x, y in zip(xs, ys)]
+        gmf_point = gmf_gpd[gmf_gpd.geometry.within(Point(coords).buffer(0.1))]
+        if len(gmf_point) == 0:
+            return np.nan
+            
+        points = np.array([[p.x, p.y] for p in gmf_point.geometry])
         values = np.array(gmf_point[imt_type])
+        
+        if len(points) == 0 or len(values) == 0:
+            return np.nan
+            
         xi = [coords[0], coords[1]]
-        result = griddata(points, values, xi, method="cubic")
-        return result.item()
+        try:
+            result = griddata(points, values, xi, method="cubic")
+            return result.item()
+        except ValueError:
+            return np.nan
 
     @staticmethod
     def get_imt_at_line(start_coords, end_coords, imt_type, gmf_gpd):
@@ -580,7 +584,13 @@ class FragilityBasedDisruption:
             },
         )
 
-        ctx.add_basemap(ax, source=ctx.providers.Stamen.Terrain)
+        try:
+            ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+        except SSLError:
+            print("Warning: Could not load basemap due to SSL certificate error. Proceeding without basemap.")
+        except Exception as e:
+            print(f"Warning: Could not load basemap. Proceeding without basemap. Error: {str(e)}")
+            
         ax.set_title(
             f"{imt_column} map for a 1-in-2475-year seismic event", fontsize=16
         )
@@ -598,6 +608,10 @@ class FragilityBasedDisruption:
         :param state_cdf: The cumulative probabilities of the component being in different damage states
         :type state_cdf: list
         """
+        if not np.isfinite(imt_value):
+            print(f"Warning: Invalid {imt_type} value ({imt_value}). Skipping plot.")
+            return
+
         imt_list = np.linspace(0.001, imt_value * 2, 100)
         frag_df = pd.DataFrame(columns=["imt", "state", "fragility"])
 
@@ -605,16 +619,13 @@ class FragilityBasedDisruption:
             median = self.fragility_curves[compon_type][state]["ds_median"]
             stdev = self.fragility_curves[compon_type][state]["ds_beta"]
             for imt in imt_list:
-                frag_df = frag_df.append(
-                    {
-                        "imt": imt,
-                        "state": state,
-                        "fragility": self.calculate_state_probability(
-                            imt, median, stdev
-                        ),
-                    },
-                    ignore_index=True,
-                )
+                new_row = pd.DataFrame({
+                    "imt": [imt],
+                    "state": [state],
+                    "fragility": [self.calculate_state_probability(imt, median, stdev)]
+                })
+                frag_df = pd.concat([frag_df, new_row], ignore_index=True)
+
         sns.set_style("ticks")
         sns.set_context("paper", font_scale=1.5)
 
@@ -643,7 +654,6 @@ class FragilityBasedDisruption:
         ax.set_ylim(0, 1)
 
     def plot_disruptions(self, integrated_graph, map_extends):
-
         plots = {"water": None, "power": None, "transpo": None}
 
         for infra, _ in plots.items():
@@ -651,10 +661,12 @@ class FragilityBasedDisruption:
                 integrated_graph, infra, map_extends
             )
 
-        water_tab = Panel(child=plots["water"], title="Water")
-        power_tab = Panel(child=plots["power"], title="Power")
-        transpo_tab = Panel(child=plots["transpo"], title="Transport")
-        tabs = Tabs(tabs=[water_tab, power_tab, transpo_tab])
+        # Create tabs using the current Bokeh API
+        tabs = Tabs(tabs=[
+            TabPanel(title="Water", child=plots["water"]),
+            TabPanel(title="Power", child=plots["power"]),
+            TabPanel(title="Transport", child=plots["transpo"])
+        ])
 
         show(tabs)
 
@@ -793,22 +805,47 @@ class FragilityBasedDisruption:
         return p
 
     def plot_failure_distributions(self):
-        fig, ax = plt.subplots(figsize=(7, 4))
+        """Plots the distribution of failure states across different infrastructure types"""
+        if self.fail_probs_df is None or len(self.fail_probs_df) == 0:
+            print("No failure probability data available to plot.")
+            return
+
+        fig, ax = plt.subplots(figsize=(10, 6))
         sns.set_context("paper", font_scale=1.5)
         sns.set_style("ticks")
+
+        # Ensure the disruption_state column exists and has valid values
+        if "disruption_state" not in self.fail_probs_df.columns:
+            print("No disruption state data available to plot.")
+            return
+
+        # Define the expected states
+        expected_states = ["None", "Slight", "Moderate", "Extensive", "Complete"]
+        
+        # Filter out any rows with invalid disruption states
+        valid_states = self.fail_probs_df["disruption_state"].isin(expected_states)
+        if not valid_states.any():
+            print("No valid disruption states found in the data.")
+            return
+
+        plot_data = self.fail_probs_df[valid_states].copy()
+
         g = sns.histplot(
-            data=self.fail_probs_df,
+            data=plot_data,
             x="infra",
             hue="disruption_state",
             stat="count",
             multiple="dodge",
             shrink=0.8,
             common_norm=False,
-            hue_order=["None", "Slight", "Moderate", "Extensive", "Complete"],
+            hue_order=expected_states,
             ax=ax,
         )
         ax.set_xlabel("Infrastructure")
         ax.set_ylabel("Number of components")
+        ax.set_title("Distribution of failure states across infrastructure types", fontsize=16)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
 
     def generate_disruption_file(
         self, location=None, folder_extra=None, minimum_data=0, maximum_data=None
